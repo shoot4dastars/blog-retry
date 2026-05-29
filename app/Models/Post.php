@@ -34,4 +34,15 @@ class Post extends Model
     public function status(){
         return $this->morphOne(Status::class, 'statusable');
     }
+
+    public function scopePublished($query){
+        return $query->whereHas('status', function($q){
+            $q->where('status', 'published');
+        });
+    }
+
+    public function getRouteKeyName()
+    {
+        return 'slug';
+    }
 }

@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StorePostRequest;
+use App\Http\Requests\UpdatePostRequest;
 use App\Models\Category;
 use Illuminate\Http\Request;
 use App\Models\Post;
@@ -36,28 +38,23 @@ class PostController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(StorePostRequest $request)
     {
-        //
-        $validated = $request->validate([
-            'title' => 'required|min:5',
-            'body' => 'required|max:1000',
-            'categories' => 'array'
-        ]);
+        $validated = $request->validated();
 
         $post = Post::create([
             'title' => $validated['title'],
-            'slug' => \Str::slug($validated['title']),
+            'slug' => $this->generateUniqueSlug($validated['title']),
             'body' => $validated['body'],
             'user_id' => auth()->id(),
         ]);
 
-        if (isset($validated['categories'])){
-            $post->categories()->attach($validated['categories']);
+        if (!empty($validated['category_ids'])) {
+            $post->categories()->attach($validated['category_ids']);
         }
 
         $post->status()->create([
-            'status' => $request->status ?? 'draft'
+            'status' => $validated['status'] ?? 'draft'
         ]);
 
         return redirect()->route('posts.index');
@@ -92,30 +89,31 @@ class PostController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Post $post)
+    public function update(UpdatePostRequest $request, Post $post)
     {
-        $validated = $request->validate([
-            'title' => 'required|min:5',
-            'body' => 'required|max:1000',
-            'categories' => 'array'
-        ]);
+        $validated = $request->validated();
+        $slug = $post->slug;
+
+        if (isset($validated['title']) && $validated['title'] !== $post->title) {
+            $slug = $this->generateUniqueSlug($validated['title']);
+        }
 
         $post->update([
             'title' => $validated['title'],
-            'slug' => \Str::slug($validated['title']),
+            'slug' => $slug,
             'body' => $validated['body'],
         ]);
 
-        if ($request->filled('categories')) {
-            $post->categories()->sync($validated['categories']);
+        if (!empty($validated['category_ids'])) {
+            $post->categories()->sync($validated['category_ids']);
         } else {
             $post->categories()->detach();
         }
 
         $post->status()->updateOrCreate(
-            [], // no condition because morphOne is unique per post
+            [],
             [
-                'status' => $request->status ?? 'draft'
+                'status' => $validated['status'] ?? 'draft'
             ]
         );
 
@@ -135,5 +133,13 @@ class PostController extends Controller
 
         return redirect()->route('posts.index')
             ->with('success', 'Post deleted successfully.');
+    }
+
+    private function generateUniqueSlug(string $title): string
+    {
+        $slug = \Str::slug($title);
+        $count = Post::where('slug', 'LIKE', "{$slug}%")->count();
+        if ($count) {$slug .= '-' . ($count + 1);}
+        return $slug;
     }
 }

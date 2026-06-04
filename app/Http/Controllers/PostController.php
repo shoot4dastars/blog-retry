@@ -5,14 +5,26 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StorePostRequest;
 use App\Http\Requests\UpdatePostRequest;
 use App\Models\Category;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use App\Models\Post;
+use App\Models\PostView;
+use Illuminate\Support\Facades\Cookie;
+use Illuminate\Support\Str;
 
 class PostController extends Controller
 {
     /**
      * Display a listing of the resource.
      */
+    use AuthorizesRequests;
+    private function generateUniqueSlug(string $title): string
+    {
+        $slug = \Str::slug($title);
+        $count = Post::where('slug', 'LIKE', "{$slug}%")->count();
+        if ($count) {$slug .= '-' . ($count + 1);}
+        return $slug;
+    }
 
     public function index()
     {
@@ -41,12 +53,12 @@ class PostController extends Controller
     public function store(StorePostRequest $request)
     {
         $validated = $request->validated();
-
+        $user = $request->user();
         $post = Post::create([
             'title' => $validated['title'],
             'slug' => $this->generateUniqueSlug($validated['title']),
             'body' => $validated['body'],
-            'user_id' => auth()->id(),
+            'user_id' => $user->id,
         ]);
 
         if (!empty($validated['category_ids'])) {
@@ -57,7 +69,7 @@ class PostController extends Controller
             'status' => $validated['status'] ?? 'draft'
         ]);
 
-        return redirect()->route('posts.index');
+        return redirect()->route('posts.index')->with('success','Post created successfully.');
     }
 
     /**
@@ -65,10 +77,39 @@ class PostController extends Controller
      */
     public function show(Post $post)
     {
-        //
-        $post->increment('view_count');
+        $this->authorize('view', $post);
+        $visitorId = request()->cookie('visitor_id');
 
-        $post->load(['user', 'categories', 'status']);
+        if (!$visitorId) {
+            $visitorId = (string) Str::uuid();
+            Cookie::queue(
+                'visitor_id',
+                $visitorId,
+                60 * 24 * 365
+            );
+        }
+
+        $alreadyViewed = PostView::where('post_id', $post->id)
+            ->where(function ($q) use ($visitorId) {
+                if (auth()->check()) {
+                    $q->where('user_id', auth()->id());
+                } else {
+                    $q->where('visitor_id', $visitorId);
+                }
+            })
+            ->exists();
+
+        if (! $alreadyViewed) {
+            PostView::create([
+                'post_id'    => $post->id,
+                'user_id'    => auth()->id(),
+                'visitor_id' => auth()->check() ? null : $visitorId,
+            ]);
+            $post->increment('view_count');
+            $post->refresh();
+        }
+
+        $post->load(['user', 'categories', 'status', 'comments.user']);
 
         return view('posts.show', compact('post'));
     }
@@ -110,12 +151,15 @@ class PostController extends Controller
             $post->categories()->detach();
         }
 
-        $post->status()->updateOrCreate(
-            [],
-            [
+        if ($post->status) {
+            $post->status->update([
+                'status' => $validated['status'] ?? $post->status->status
+            ]);
+        } else {
+            $post->status()->create([
                 'status' => $validated['status'] ?? 'draft'
-            ]
-        );
+            ]);
+        }
 
         return redirect()->route('posts.index')
             ->with('success', 'Post updated successfully.');
@@ -135,11 +179,76 @@ class PostController extends Controller
             ->with('success', 'Post deleted successfully.');
     }
 
-    private function generateUniqueSlug(string $title): string
+    public function dashboard()
     {
-        $slug = \Str::slug($title);
-        $count = Post::where('slug', 'LIKE', "{$slug}%")->count();
-        if ($count) {$slug .= '-' . ($count + 1);}
-        return $slug;
+        $user = auth()->user();
+
+        $publishedCount = Post::where('user_id', $user->id)
+            ->published()
+            ->count();
+
+        $draftCount = Post::where('user_id', $user->id)
+            ->draft()
+            ->count();
+
+        $pendingCount = Post::where('user_id', $user->id)
+            ->submitted()
+            ->count();
+
+        return view('dashboard',compact('user', 'publishedCount', 'draftCount', 'pendingCount'));
+    }
+
+    public function myPosts()
+    {
+        $posts = Post::published()
+            ->where('user_id', auth()->id())
+            ->latest()
+            ->paginate(8);
+        $pageTitle = 'My Published Posts';
+        $alertMsg = 'No published posts yet';
+
+        return view('posts.index',  ['title'=>'My Posts'], compact('posts', 'pageTitle', 'alertMsg'));
+    }
+
+    public function myDrafts()
+    {
+        $posts = Post::draft()
+            ->where('user_id', auth()->id())
+            ->latest()
+            ->paginate(8);
+        $pageTitle = 'My Drafts';
+        $alertMsg = 'No drafts yet';
+
+        return view('posts.index',  ['title'=>'My Drafts'], compact('posts', 'pageTitle', 'alertMsg'));
+    }
+
+    public function pending()
+    {
+        $pageTitle = 'Pending Posts';
+        $alertMsg = 'No pending posts yet';
+
+        if (auth()->user()->hasPermissionTo('publish-posts')) {
+            $posts = Post::submitted()
+                ->latest()
+                ->paginate(8);
+
+        } else {
+            $posts = Post::submitted()
+                ->where('user_id', auth()->id())
+                ->latest()
+                ->paginate(8);
+        }
+
+        return view('posts.index',  ['title'=>'Pending'], compact('posts', 'pageTitle', 'alertMsg'));
+    }
+
+    public function approve(Post $post)
+    {
+        $post->status()->updateOrCreate(
+            [],
+            ['status' => 'published']
+        );
+
+        return back()->with('success', 'Post approved successfully.');
     }
 }

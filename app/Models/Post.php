@@ -24,7 +24,7 @@ class Post extends Model
     }
 
     public function comments(){
-        return $this->hasMany(Comment::class);
+        return $this->hasMany(Comment::class)->latest();
     }
 
     public function categories(){
@@ -41,8 +41,25 @@ class Post extends Model
         });
     }
 
+    public function scopeDraft($query){
+        return $query->whereHas('status', function($q){
+            $q->where('status', 'draft');
+        });
+    }
+
+    public function scopeSubmitted($query){
+        return $query->whereHas('status', function($q){
+            $q->where('status', 'submitted');
+        });
+    }
+
     public function getRouteKeyName()
     {
         return 'slug';
+    }
+
+    public function views()
+    {
+        return $this->hasMany(PostView::class);
     }
 }

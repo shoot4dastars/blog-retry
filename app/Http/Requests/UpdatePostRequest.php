@@ -28,7 +28,7 @@ class UpdatePostRequest extends FormRequest
             'body' => 'sometimes|required|string|min:100|max:1000',
             'category_ids' => 'sometimes|array',
             'category_ids.*' => 'exists:categories,id',
-            'status' => 'sometimes|in:draft,published'
+            'status' => 'sometimes|in:draft,published,submitted'
         ];
     }
     public function messages(): array

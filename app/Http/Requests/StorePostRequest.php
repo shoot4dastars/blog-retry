@@ -27,7 +27,7 @@ class StorePostRequest extends FormRequest
             'body' => 'required|string|min:100|max:1000',
             'category_ids' => 'array',
             'category_ids.*' => 'exists:categories,id',
-            'status' => 'sometimes|in:draft,published'
+            'status' => 'required|in:draft,published,submitted'
         ];
     }
 

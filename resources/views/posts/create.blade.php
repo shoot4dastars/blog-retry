@@ -1,116 +1,69 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Create Post</title>
+@extends('layouts.app')
 
-    <style>
-        body{
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 40px auto;
-            padding: 20px;
-        }
+@section('title', 'Create Post')
 
-        form{
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
+@section('content')
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-lg">
+                <div class="card-header bg-transparent border-0 pt-4">
+                    <h2 class="mb-0 fw-bold text-gradient" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); -webkit-background-clip: text; background-clip: text; color: transparent;">Create New Post</h2>
+                    <p class="text-muted mt-1">Share your thoughts with the community</p>
+                </div>
+                <div class="card-body p-4">
+                    <form action="{{ route('posts.store') }}" method="POST">
+                        @csrf
+                        <div class="mb-4">
+                            <label class="form-label fw-semibold">Title</label>
+                            <input type="text" name="title" class="form-control" value="{{ old('title') }}" placeholder="Give your post a catchy title">
+                            @error('title')
+                            <div class="text-danger small mt-1">{{ $message }}</div>
+                            @enderror
+                        </div>
 
-        label{
-            font-weight: bold;
-        }
+                        <div class="mb-4">
+                            <label class="form-label fw-semibold">Content</label>
+                            <textarea name="body" rows="8" class="form-control" placeholder="Write your story...">{{ old('body') }}</textarea>
+                            @error('body')
+                            <div class="text-danger small mt-1">{{ $message }}</div>
+                            @enderror
+                        </div>
 
-        input,
-        textarea,
-        select{
-            padding: 10px;
-            font-size: 16px;
-            width: 100%;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-        }
+                        <div class="mb-4">
+                            <label class="form-label fw-semibold">Categories</label>
+                            <select name="category_ids[]" class="form-select" multiple size="4">
+                                @foreach($categories as $category)
+                                    <option value="{{ $category->id }}">{{ $category->name }}</option>
+                                @endforeach
+                            </select>
+                            <div class="form-text text-muted">Hold Ctrl/Cmd to select multiple</div>
+                        </div>
 
-        textarea{
-            min-height: 200px;
-            resize: vertical;
-        }
+                        <input type="hidden" name="status" id="status-input" value="draft">
 
-        button{
-            width: fit-content;
-            padding: 10px 20px;
-            cursor: pointer;
-            border: none;
-            background: #000;
-            color: #fff;
-            border-radius: 6px;
-        }
-
-        .error{
-            color: red;
-            font-size: 14px;
-        }
-
-        .hint{
-            font-size: 12px;
-            color: #666;
-        }
-    </style>
-</head>
-<body>
-
-<h1>Create Post</h1>
-
-<form action="{{ route('posts.store') }}" method="POST">
-    @csrf
-
-    {{-- Title --}}
-    <div>
-        <label>Title</label>
-        <input type="text" name="title" value="{{ old('title') }}">
+                        <div class="d-flex gap-3 mt-4">
+                            <button type="submit" class="btn btn-secondary px-4" onclick="setStatus('draft')">
+                                Save as Draft
+                            </button>
+                            @can('publish-posts')
+                            <button type="submit" class="btn btn-success px-4" onclick="setStatus('published')">
+                                Publish Now
+                            </button>
+                            @else
+                                <button type="submit" class="btn btn-primary px-4" onclick="setStatus('submitted')">
+                                    Submit for Review
+                                </button>
+                                @endcan
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
 
-    {{-- Body --}}
-    <div>
-        <label>Content</label>
-        <textarea name="body">{{ old('body') }}</textarea>
-    </div>
-
-    {{-- Categories --}}
-    <div>
-        <label>Categories</label>
-        <select name="categories[]" multiple>
-            @foreach($categories as $category)
-                <option value="{{ $category->id }}">
-                    {{ $category->name }}
-                </option>
-            @endforeach
-        </select>
-    </div>
-
-    {{-- Hidden status field --}}
-    <input type="hidden" name="status" id="status-input" value="published">
-
-    {{-- Buttons --}}
-    <div style="display:flex; gap:10px; margin-top:20px;">
-
-        <button type="submit" onclick="setStatus('draft')">
-            Save as Draft
-        </button>
-
-        <button type="submit" onclick="setStatus('published')">
-            Publish
-        </button>
-
-    </div>
-</form>
-
-<script>
-    function setStatus(value) {
-        document.getElementById('status-input').value = value;
-    }
-</script>
-</body>
-</html>
+    <script>
+        function setStatus(value) {
+            document.getElementById('status-input').value = value;
+        }
+    </script>
+@endsection

@@ -16,6 +16,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'auth.custom' => \App\Http\Middleware\AuthMiddleware::class,
             'guest' => \App\Http\Middleware\GuestMiddleware::class,
+            'active' => \App\Http\Middleware\EnsureUserIsActive::class,
+            'admin' => \App\Http\Middleware\AdminCheck::class,
+            'permission' => \App\Http\Middleware\CheckPermission::class,
+            'log.requests' => \App\Http\Middleware\LogRequestDetails::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

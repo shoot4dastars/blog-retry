@@ -3,9 +3,11 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Traits\HasPermissions;
 
 class Role extends Model
 {
+    use HasPermissions;
     //
     protected $fillable = [
         'name'

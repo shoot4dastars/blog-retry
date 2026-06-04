@@ -1,126 +1,80 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Edit Post</title>
+@extends('layouts.app')
 
-    <style>
-        body{
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 40px auto;
-            padding: 20px;
-        }
+@section('title', 'Edit Post')
 
-        form{
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
+@section('content')
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-lg">
+                <div class="card-header bg-transparent border-0 pt-4">
+                    <h2 class="mb-0 fw-bold">✏️ Edit Post</h2>
+                    <p class="text-muted">Update your content and manage status</p>
+                </div>
+                <div class="card-body p-4">
+                    @can('update', $post)
+                        <form action="{{ route('posts.update', $post) }}" method="POST">
+                            @csrf
+                            @method('PUT')
 
-        label{
-            font-weight: bold;
-        }
+                            <div class="mb-4">
+                                <label class="form-label fw-semibold">Title</label>
+                                <input type="text" name="title" class="form-control" value="{{ old('title', $post->title) }}">
+                                @error('title')
+                                <div class="text-danger small mt-1">{{ $message }}</div>
+                                @enderror
+                            </div>
 
-        input,
-        textarea,
-        select{
-            padding: 10px;
-            font-size: 16px;
-            width: 100%;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-        }
+                            <div class="mb-4">
+                                <label class="form-label fw-semibold">Content</label>
+                                <textarea name="body" rows="8" class="form-control">{{ old('body', $post->body) }}</textarea>
+                                @error('body')
+                                <div class="text-danger small mt-1">{{ $message }}</div>
+                                @enderror
+                            </div>
 
-        textarea{
-            min-height: 200px;
-            resize: vertical;
-        }
+                            <div class="mb-4">
+                                <label class="form-label fw-semibold">Categories</label>
+                                <select name="category_ids[]" class="form-select" multiple size="4">
+                                    @foreach($categories as $category)
+                                        <option value="{{ $category->id }}" @if($post->categories->contains($category->id)) selected @endif>
+                                            {{ $category->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <div class="form-text text-muted">Hold Ctrl/Cmd to select multiple</div>
+                            </div>
 
-        button{
-            width: fit-content;
-            padding: 10px 20px;
-            cursor: pointer;
-            border: none;
-            background: #000;
-            color: #fff;
-            border-radius: 6px;
-        }
+                            <input type="hidden" name="status" id="status-input" value="{{ old('status', $post->status?->status ?? 'draft') }}">
 
-        .error{
-            color: red;
-            font-size: 14px;
-        }
+                            <div class="d-flex gap-3 mt-4">
+                                <button type="submit" class="btn btn-secondary px-4" onclick="setStatus('draft')">
+                                    Update Draft
+                                </button>
 
-        .hint{
-            font-size: 12px;
-            color: #666;
-        }
-    </style>
-</head>
-<body>
-
-<h1>Edit Post</h1>
-
-<form action="{{ route('posts.update', $post) }}" method="POST">
-
-    @csrf
-    @method('PUT')
-
-    {{-- Title --}}
-    <div>
-        <label>Title</label>
-
-        <input
-            type="text"
-            name="title"
-            value="{{ old('title', $post->title) }}"
-        >
-
-        @error('title')
-        <div class="error">{{ $message }}</div>
-        @enderror
-    </div>
-
-    {{-- Body --}}
-    <div>
-        <label>Content</label>
-
-        <textarea name="body">{{ old('body', $post->body) }}</textarea>
-
-        @error('body')
-        <div class="error">{{ $message }}</div>
-        @enderror
-    </div>
-
-    {{-- Categories --}}
-    <div>
-        <label>Categories</label>
-
-        <select name="categories[]" multiple>
-
-            @foreach($categories as $category)
-                <option value="{{ $category->id }}"
-                        @if($post->categories->contains($category->id)) selected @endif
-                >
-                    {{ $category->name }}
-                </option>
-            @endforeach
-
-        </select>
-
-        <div class="hint">
-            Hold Ctrl (Windows) or Cmd (Mac) to select multiple
+                                @can('publish-posts')
+                                    <button type="submit" class="btn btn-success px-4" onclick="setStatus('published')">
+                                        Update & Publish
+                                    </button>
+                                @else
+                                    <button type="submit" class="btn btn-primary px-4" onclick="setStatus('submitted')">
+                                        Submit for Review
+                                    </button>
+                                @endcan
+                            </div>
+                        </form>
+                    @else
+                        <div class="alert alert-warning border-0 rounded-3">
+                            <i class="bi bi-shield-lock-fill me-2"></i> You are not authorized to edit this post.
+                        </div>
+                    @endcan
+                </div>
+            </div>
         </div>
     </div>
 
-    {{-- Submit --}}
-    <button type="submit">
-        Update Post
-    </button>
-
-</form>
-
-</body>
-</html>
+    <script>
+        function setStatus(value) {
+            document.getElementById('status-input').value = value;
+        }
+    </script>
+@endsection
